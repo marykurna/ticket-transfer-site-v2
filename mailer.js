@@ -5,7 +5,7 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 async function sendTransferEmail(to, eventName, acceptLink, senderName, ticketType, amount, currency) {
   const { data, error } = await resend.emails.send({
-    from: 'Tickets <onboarding@resend.dev>', 
+    from: 'Tickets <tickets@howlerza.co.za>', 
     to: to,
     subject: `You have a ticket transfer to accept: ${eventName}`,
     html: `
@@ -31,7 +31,7 @@ async function sendTransferEmail(to, eventName, acceptLink, senderName, ticketTy
 
 async function sendTicketEmail(to, eventName, ticketCode, qrDataUrl) {
   const { data, error } = await resend.emails.send({
-    from: 'Tickets <onboarding@resend.dev>',
+    from: 'Tickets <tickets@howlerza.co.za>',
     to: to,
     subject: `Your ticket for ${eventName}`,
     html: `
