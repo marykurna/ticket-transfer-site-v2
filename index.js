@@ -30,25 +30,7 @@ app.get('/admin', (req, res) => {
     <!DOCTYPE html>
     <html>
     <head>
-      <!-- Meta Pixel Code -->
-      <script>
-      !function(f,b,e,v,n,t,s)
-      {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-      n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-      if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-      n.queue=[];t=b.createElement(e);t.async=!0;
-      t.src=v;s=b.getElementsByTagName(e)[0];
-      s.parentNode.insertBefore(t,s)}(window, document,'script',
-      'https://connect.facebook.net/en_US/fbevents.js');
-      fbq('init', '3191889931006050');
-      fbq('track', 'PageView');
-      </script>
-      <noscript><img height="1" width="1" style="display:none"
-      src="https://www.facebook.com/tr?id=3191889931006050&ev=PageView&noscript=1"
-      /></noscript>
-      <!-- End Meta Pixel Code -->
-
-      <title>Admin Panel - Send Ticket</title>
+      <title>Admin Panel</title>
       <style>
         body { font-family: sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; background: #f9f9f9; }
         .card { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
@@ -63,16 +45,16 @@ app.get('/admin', (req, res) => {
         <h2>🎟️ Send a Ticket Transfer</h2>
         <form id="ticketForm">
           <label>Sender Name:</label>
-          <input type="text" id="sender_name" required placeholder="e.g. John Doe">
+          <input type="text" id="sender_name" required>
 
           <label>Event Name:</label>
-          <input type="text" id="event_name" required placeholder="e.g. VIP Concert">
+          <input type="text" id="event_name" required>
 
           <label>Ticket Type:</label>
-          <input type="text" id="ticket_type" required placeholder="e.g. VIP, Standard">
+          <input type="text" id="ticket_type" required>
 
           <label>Amount to Pay:</label>
-          <input type="number" id="amount" required placeholder="e.g. 50.00" step="0.01">
+          <input type="number" id="amount" required step="0.01">
 
           <label>Currency:</label>
           <select id="currency">
@@ -82,8 +64,8 @@ app.get('/admin', (req, res) => {
             <option value="GBP">GBP (£)</option>
           </select>
 
-          <label>Buyer's Email (Receiver):</label>
-          <input type="email" id="buyer_email" required placeholder="client@example.com">
+          <label>Buyer's Email:</label>
+          <input type="email" id="buyer_email" required>
 
           <button type="submit">Send Transfer Email</button>
         </form>
@@ -107,20 +89,24 @@ app.get('/admin', (req, res) => {
           msg.style.color = "blue";
           msg.innerText = "Sending email...";
 
-          const res = await fetch('/api/admin/send', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-          });
-
-          const result = await res.json();
-          if (result.ok) {
-            msg.style.color = "green";
-            msg.innerText = "✅ Email sent successfully to " + data.buyer_email;
-            document.getElementById('ticketForm').reset();
-          } else {
+          try {
+            const res = await fetch('/api/admin/send', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(data)
+            });
+            const result = await res.json();
+            if (result.ok) {
+              msg.style.color = "green";
+              msg.innerText = "✅ Email sent successfully to " + data.buyer_email;
+              document.getElementById('ticketForm').reset();
+            } else {
+              msg.style.color = "red";
+              msg.innerText = "❌ Error: " + result.error;
+            }
+          } catch (err) {
             msg.style.color = "red";
-            msg.innerText = "❌ Error: " + result.error;
+            msg.innerText = "❌ Network error.";
           }
         });
       </script>
@@ -138,24 +124,6 @@ function sendDashboard(res) {
     <!DOCTYPE html>
     <html>
     <head>
-      <!-- Meta Pixel Code -->
-      <script>
-      !function(f,b,e,v,n,t,s)
-      {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-      n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-      if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-      n.queue=[];t=b.createElement(e);t.async=!0;
-      t.src=v;s=b.getElementsByTagName(e)[0];
-      s.parentNode.insertBefore(t,s)}(window, document,'script',
-      'https://connect.facebook.net/en_US/fbevents.js');
-      fbq('init', '3191889931006050');
-      fbq('track', 'PageView');
-      </script>
-      <noscript><img height="1" width="1" style="display:none"
-      src="https://www.facebook.com/tr?id=3191889931006050&ev=PageView&noscript=1"
-      /></noscript>
-      <!-- End Meta Pixel Code -->
-      
       <title>Admin Dashboard</title>
       <style>
         body { font-family: sans-serif; max-width: 1000px; margin: 40px auto; padding: 20px; background: #f9f9f9; }
@@ -194,32 +162,36 @@ function sendDashboard(res) {
       </table>
       <script>
         async function loadTickets() {
-          const res = await fetch('/api/admin/tickets');
-          const data = await res.json();
-          const tbody = document.getElementById('ticketTable');
-          if (!data.ok || data.tickets.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6">No tickets found.</td></tr>';
-            return;
-          }
-          
-          tbody.innerHTML = data.tickets.map(function(t) {
-            var actionHtml = '';
-            if (t.status === 'pending_verification') {
-              actionHtml = '<a href="' + t.receipt_url + '" target="_blank" style="color:blue; margin-right:10px;">View Receipt</a>' +
-                           '<button class="approve-btn" onclick="approveTicket(\'' + t.token + '\')">Approve</button>';
-            } else if (t.status === 'sold') {
-              actionHtml = '<span style="color:green; font-weight:bold;">✅ Sent</span>';
+          try {
+            const res = await fetch('/api/admin/tickets');
+            const data = await res.json();
+            const tbody = document.getElementById('ticketTable');
+            if (!data.ok || data.tickets.length === 0) {
+              tbody.innerHTML = '<tr><td colspan="6">No tickets found.</td></tr>';
+              return;
             }
+            
+            tbody.innerHTML = data.tickets.map(function(t) {
+              var actionHtml = '';
+              if (t.status === 'pending_verification') {
+                actionHtml = '<a href="' + t.receipt_url + '" target="_blank" style="color:blue; margin-right:10px;">View Receipt</a>' +
+                             '<button class="approve-btn" onclick="approveTicket(\\'' + t.token + '\\')">Approve</button>';
+              } else if (t.status === 'sold') {
+                actionHtml = '<span style="color:green; font-weight:bold;">✅ Sent</span>';
+              }
 
-            return '<tr>' +
-              '<td><b>' + t.ticket_code + '</b></td>' +
-              '<td>' + t.event_name + '</td>' +
-              '<td>' + t.buyer_email + '</td>' +
-              '<td>' + t.currency + ' ' + t.amount + '</td>' +
-              '<td><span class="status ' + t.status + '">' + t.status.replace('_', ' ') + '</span></td>' +
-              '<td>' + actionHtml + '</td>' +
-            '</tr>';
-          }).join('');
+              return '<tr>' +
+                '<td><b>' + t.ticket_code + '</b></td>' +
+                '<td>' + t.event_name + '</td>' +
+                '<td>' + t.buyer_email + '</td>' +
+                '<td>' + t.currency + ' ' + t.amount + '</td>' +
+                '<td><span class="status ' + t.status + '">' + t.status.replace('_', ' ') + '</span></td>' +
+                '<td>' + actionHtml + '</td>' +
+              '</tr>';
+            }).join('');
+          } catch (err) {
+            document.getElementById('ticketTable').innerHTML = '<tr><td colspan="6">Error loading tickets.</td></tr>';
+          }
         }
 
         async function approveTicket(token) {
@@ -273,25 +245,6 @@ app.get('/accept/:token', (req, res) => {
   
   res.send(`
     <html>
-    <head>
-      <!-- Meta Pixel Code -->
-      <script>
-      !function(f,b,e,v,n,t,s)
-      {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-      n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-      if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-      n.queue=[];t=b.createElement(e);t.async=!0;
-      t.src=v;s=b.getElementsByTagName(e)[0];
-      s.parentNode.insertBefore(t,s)}(window, document,'script',
-      'https://connect.facebook.net/en_US/fbevents.js');
-      fbq('init', '3191889931006050');
-      fbq('track', 'PageView');
-      </script>
-      <noscript><img height="1" width="1" style="display:none"
-      src="https://www.facebook.com/tr?id=3191889931006050&ev=PageView&noscript=1"
-      /></noscript>
-      <!-- End Meta Pixel Code -->
-    </head>
     <body style="font-family:sans-serif;text-align:center;margin-top:50px;">
       <h2>Ticket Transfer</h2>
       <p><b>${t.sender_name}</b> sent you a ticket for ${t.event_name}</p>
@@ -315,8 +268,6 @@ app.post('/accept/:token', (req, res) => {
       <div style="background:#f1f1f1; padding:15px; border-radius:8px; text-align:left; margin-bottom:20px;">
         <h3>Cash Send Details:</h3>
         <p><b>Bank:</b> FNB<br><b>Account Name:</b> Your Business Name<br><b>Account Number:</b> 1234567890<br><b>Reference:</b> ${t.ticket_code}</p>
-        <h3>1Voucher:</h3>
-        <p>Buy a 1Voucher for ${t.amount} and send us the voucher PIN.</p>
       </div>
 
       <p>After paying, please upload a screenshot of your receipt below:</p>
@@ -338,31 +289,9 @@ app.post('/upload-receipt/:token', upload.single('receipt'), async (req, res) =>
 
     res.send(`
       <html>
-      <head>
-        <!-- Meta Pixel Code -->
-        <script>
-        !function(f,b,e,v,n,t,s)
-        {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-        n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-        if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-        n.queue=[];t=b.createElement(e);t.async=!0;
-        t.src=v;s=b.getElementsByTagName(e)[0];
-        s.parentNode.insertBefore(t,s)}(window, document,'script',
-        'https://connect.facebook.net/en_US/fbevents.js');
-        fbq('init', '3191889931006050');
-        fbq('track', 'PageView');
-        </script>
-        <noscript><img height="1" width="1" style="display:none"
-        src="https://www.facebook.com/tr?id=3191889931006050&ev=PageView&noscript=1"
-        /></noscript>
-        <!-- End Meta Pixel Code -->
-      </head>
       <body style="font-family:sans-serif;text-align:center;margin-top:50px;">
         <h2>Receipt Uploaded Successfully! ✅</h2>
         <p>We will verify your payment shortly. Once confirmed, your ticket will be emailed to <b>${t.buyer_email}</b>.</p>
-        <script>
-          fbq('track', 'Purchase', {value: ${t.amount}, currency: '${t.currency}'});
-        </script>
       </body></html>
     `);
   } catch (err) {
