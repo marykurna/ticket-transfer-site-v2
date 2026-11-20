@@ -181,8 +181,9 @@ function sendDashboard(res) {
             tbody.innerHTML = data.tickets.map(function(t) {
               var actionHtml = '';
               if (t.status === 'pending_verification') {
+                // The fix is right here, using &quot; instead of escaped quotes
                 actionHtml = '<a href="' + t.receipt_url + '" target="_blank" style="color:blue; margin-right:10px;">View Receipt</a>' +
-                             '<button class="approve-btn" onclick="approveTicket(\'' + t.token + '\')">Approve</button>';
+                             '<button class="approve-btn" onclick="approveTicket(&quot;' + t.token + '&quot;)">Approve</button>';
               } else if (t.status === 'sold') {
                 actionHtml = '<span style="color:green; font-weight:bold;">✅ Sent</span>';
               }
@@ -216,21 +217,16 @@ function sendDashboard(res) {
   `);
 }
 
-// API: GET ALL TICKETS (with empty database crash fix)
+// API: GET ALL TICKETS
 app.get('/api/admin/tickets', (req, res) => {
   try {
-    // Check if the database table exists first
     const checkTable = db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='tickets'`).get();
-    
     if (!checkTable) {
-      // If the table doesn't exist yet, return an empty list instead of crashing
       return res.json({ ok: true, tickets: [] });
     }
-
     const tickets = db.prepare(`SELECT * FROM tickets ORDER BY created_at DESC`).all();
     res.json({ ok: true, tickets });
   } catch (err) {
-    // If it fails, send the error back so the browser can display it
     res.status(500).json({ ok: false, error: err.message });
   }
 });
