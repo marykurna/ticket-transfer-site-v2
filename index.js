@@ -11,7 +11,7 @@ const fs = require('fs');
 
 const app = express();
 
-// --- SETUP IMAGE UPLOADS ---
+// Setup Image Uploads
 const storage = multer.diskStorage({
   destination: function (req, file, cb) { cb(null, 'public/receipts/'); },
   filename: function (req, file, cb) { cb(null, Date.now() + '-' + file.originalname); }
@@ -24,7 +24,7 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// --- ADMIN PANEL ROUTE ---
+// --- ADMIN PANEL ---
 app.get('/admin', (req, res) => {
   res.send(`
     <!DOCTYPE html>
@@ -53,6 +53,9 @@ app.get('/admin', (req, res) => {
           <label>Ticket Type:</label>
           <input type="text" id="ticket_type" required>
 
+          <label>Quantity of Tickets:</label>
+          <input type="number" id="ticket_quantity" required value="1" min="1">
+
           <label>Amount to Pay:</label>
           <input type="number" id="amount" required step="0.01">
 
@@ -62,10 +65,10 @@ app.get('/admin', (req, res) => {
             <option value="USD">USD ($)</option>
           </select>
 
-          <label>Payment Method Name (e.g. Cash Send - Capitec):</label>
-          <input type="text" id="payment_method" required placeholder="e.g. 1Voucher or Cash Send">
+          <label>Payment Method Name:</label>
+          <input type="text" id="payment_method" required placeholder="e.g. Cash Send - Capitec">
 
-          <label>Payment Details (Backend instructions for buyer):</label>
+          <label>Payment Details:</label>
           <textarea id="payment_details" rows="4" required placeholder="Account Name: ...&#10;Account Number: ...&#10;Reference: ..."></textarea>
 
           <label>Buyer's Email:</label>
@@ -83,6 +86,7 @@ app.get('/admin', (req, res) => {
             sender_name: document.getElementById('sender_name').value,
             event_name: document.getElementById('event_name').value,
             ticket_type: document.getElementById('ticket_type').value,
+            ticket_quantity: document.getElementById('ticket_quantity').value,
             amount: document.getElementById('amount').value,
             currency: document.getElementById('currency').value,
             payment_method: document.getElementById('payment_method').value,
@@ -120,7 +124,7 @@ app.get('/admin', (req, res) => {
   `);
 });
 
-// DASHBOARD
+// --- DASHBOARD ---
 app.get('/', (req, res) => { sendDashboard(res); });
 app.get('/panel', (req, res) => { sendDashboard(res); });
 
@@ -133,12 +137,11 @@ function sendDashboard(res) {
       <style>
         body { font-family: sans-serif; max-width: 1000px; margin: 40px auto; padding: 20px; background: #f9f9f9; }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .btn { padding: 10px 15px; background: #007bff; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; border: none; cursor: pointer;}
-        .btn:hover { background: #0056b3; }
+        .btn { padding: 10px 15px; background: #007bff; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; }
         table { width: 100%; border-collapse: collapse; background: white; box-shadow: 0 4px 10px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; }
         th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #eee; }
         th { background: #007bff; color: white; }
-        .status { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; text-transform: capitalize; }
+        .status { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
         .status.pending_accept { background: #fff3cd; color: #856404; }
         .status.pending_verification { background: #ffe5d0; color: #c82333; }
         .status.sold { background: #d4edda; color: #155724; }
@@ -155,15 +158,16 @@ function sendDashboard(res) {
           <tr>
             <th>Ticket Code</th>
             <th>Event</th>
-            <th>Buyer Email</th>
+            <th>Qty</th>
+            <th>Buyer</th>
             <th>Amount</th>
-            <th>Payment Method</th>
+            <th>Method</th>
             <th>Status</th>
             <th>Action</th>
           </tr>
         </thead>
         <tbody id="ticketTable">
-          <tr><td colspan="7">Loading...</td></tr>
+          <tr><td colspan="8">Loading...</td></tr>
         </tbody>
       </table>
       <script>
@@ -172,44 +176,39 @@ function sendDashboard(res) {
             const res = await fetch('/api/admin/tickets');
             const data = await res.json();
             const tbody = document.getElementById('ticketTable');
-            
             if (!data.ok || data.tickets.length === 0) {
-              tbody.innerHTML = '<tr><td colspan="7">No tickets found.</td></tr>';
+              tbody.innerHTML = '<tr><td colspan="8">No tickets found.</td></tr>';
               return;
             }
             
             tbody.innerHTML = data.tickets.map(function(t) {
-              var actionHtml = '';
+              var action = '';
               if (t.status === 'pending_verification') {
-                // The fix is right here, using &quot; instead of escaped quotes
-                actionHtml = '<a href="' + t.receipt_url + '" target="_blank" style="color:blue; margin-right:10px;">View Receipt</a>' +
-                             '<button class="approve-btn" onclick="approveTicket(&quot;' + t.token + '&quot;)">Approve</button>';
+                action = '<a href="' + t.receipt_url + '" target="_blank" style="color:blue; margin-right:10px;">View Receipt</a>' +
+                         '<button class="approve-btn" onclick="approveTicket(&quot;' + t.token + '&quot;)">Approve</button>';
               } else if (t.status === 'sold') {
-                actionHtml = '<span style="color:green; font-weight:bold;">✅ Sent</span>';
+                action = '<span style="color:green; font-weight:bold;">✅ Sent</span>';
               }
-
               return '<tr>' +
                 '<td><b>' + t.ticket_code + '</b></td>' +
                 '<td>' + t.event_name + '</td>' +
+                '<td>' + (t.ticket_quantity || 1) + '</td>' +
                 '<td>' + t.buyer_email + '</td>' +
                 '<td>' + t.currency + ' ' + t.amount + '</td>' +
                 '<td>' + (t.payment_method || 'N/A') + '</td>' +
                 '<td><span class="status ' + t.status + '">' + t.status.replace('_', ' ') + '</span></td>' +
-                '<td>' + actionHtml + '</td>' +
+                '<td>' + action + '</td>' +
               '</tr>';
             }).join('');
           } catch (err) {
-            document.getElementById('ticketTable').innerHTML = '<tr><td colspan="7" style="color:red;">Error loading tickets. Please check the logs.</td></tr>';
+            document.getElementById('ticketTable').innerHTML = '<tr><td colspan="8" style="color:red;">Error loading tickets.</td></tr>';
           }
         }
-
         async function approveTicket(token) {
-          if(!confirm("Are you sure you received the money and want to send the ticket?")) return;
+          if(!confirm("Approve payment and send ticket?")) return;
           const res = await fetch('/api/admin/approve/' + token, { method: 'POST' });
-          if(res.ok) { alert("Ticket sent to buyer!"); loadTickets(); }
-          else { alert("Error approving ticket."); }
+          if(res.ok) { alert("Ticket sent!"); loadTickets(); }
         }
-
         loadTickets();
       </script>
     </body>
@@ -217,129 +216,103 @@ function sendDashboard(res) {
   `);
 }
 
-// API: GET ALL TICKETS
+// --- API: GET TICKETS ---
 app.get('/api/admin/tickets', (req, res) => {
   try {
     const checkTable = db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='tickets'`).get();
-    if (!checkTable) {
-      return res.json({ ok: true, tickets: [] });
-    }
+    if (!checkTable) return res.json({ ok: true, tickets: [] });
     const tickets = db.prepare(`SELECT * FROM tickets ORDER BY created_at DESC`).all();
     res.json({ ok: true, tickets });
-  } catch (err) {
-    res.status(500).json({ ok: false, error: err.message });
-  }
+  } catch (err) { res.status(500).json({ ok: false, error: err.message }); }
 });
 
-// API: ADMIN CREATES TICKET
+// --- API: SEND TICKET ---
 app.post('/api/admin/send', async (req, res) => {
   try {
-    const { event_name, ticket_type, sender_name, buyer_email, amount, currency, payment_method, payment_details } = req.body;
+    const { event_name, ticket_type, sender_name, buyer_email, amount, currency, payment_method, payment_details, ticket_quantity } = req.body;
     const token = uuidv4();
     const ticketCode = 'TKT-' + Math.floor(100000 + Math.random() * 900000);
-
+    
     db.prepare(
-      `INSERT INTO tickets (ticket_code, event_name, ticket_type, sender_name, buyer_email, amount, currency, payment_method, payment_details, token, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_accept')`
-    ).run(ticketCode, event_name, ticket_type, sender_name, buyer_email, amount, currency, payment_method, payment_details, token);
+      `INSERT INTO tickets (ticket_code, event_name, ticket_type, ticket_quantity, sender_name, buyer_email, amount, currency, payment_method, payment_details, token, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_accept')`
+    ).run(ticketCode, event_name, ticket_type, ticket_quantity, sender_name, buyer_email, amount, currency, payment_method, payment_details, token);
 
     const acceptLink = `${process.env.BASE_URL}/accept/${token}`;
-    await sendTransferEmail(buyer_email, event_name, acceptLink, sender_name, ticket_type, amount, currency);
-    res.json({ ok: true, message: 'Email sent', token });
-  } catch (err) {
-    res.status(500).json({ ok: false, error: err.message });
-  }
+    await sendTransferEmail(buyer_email, event_name, acceptLink, sender_name, ticket_type, ticket_quantity, amount, currency);
+    res.json({ ok: true, token });
+  } catch (err) { res.status(500).json({ ok: false, error: err.message }); }
 });
 
-// PAGE: BUYER ACCEPTS TRANSFER
+// --- ACCEPT & PAY PAGE ---
 app.get('/accept/:token', (req, res) => {
-  const t = db.prepare(`SELECT * FROM tickets WHERE token = ?`).get(req.params.token);
-  if (!t) return res.status(404).send('Invalid link.');
-  
-  res.send(`
-    <html>
-    <body style="font-family:sans-serif;text-align:center;margin-top:50px;">
-      <h2>Ticket Transfer</h2>
-      <p><b>${t.sender_name}</b> sent you a ticket for ${t.event_name}</p>
-      <p>Amount Due: ${t.currency} ${t.amount}</p>
-      <form method="POST" action="/accept/${t.token}">
-        <button style="padding:10px 20px;font-size:16px;">Accept & Pay</button>
-      </form>
-    </body></html>
-  `);
-});
-
-// PAGE: PAYMENT INSTRUCTIONS AND UPLOAD
-app.post('/accept/:token', (req, res) => {
-  const t = db.prepare(`SELECT * FROM tickets WHERE token = ?`).get(req.params.token);
-  if (!t) return res.status(404).send('Invalid link.');
-
-  res.send(`
-    <html>
-    <head>
-      <title>Complete Payment</title>
-      <style>
-        body { font-family: sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; text-align: center; }
-        .card { background: #f9f9f9; padding: 20px; border-radius: 10px; text-align: left; margin-bottom: 20px; border: 1px solid #eee; }
-        button { padding: 12px 20px; font-size: 16px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; }
-        button:hover { background: #218838; }
-        pre { white-space: pre-wrap; font-family: sans-serif; }
-      </style>
-    </head>
-    <body>
-      <h2>Complete Your Payment</h2>
-      <p>Please pay <b>${t.currency} ${t.amount}</b> using the method below.</p>
-      
-      <div class="card">
-        <h3>${t.payment_method}</h3>
-        <pre>${t.payment_details}</pre>
-      </div>
-
-      <p>After paying, please upload a screenshot of your receipt below:</p>
-      <form method="POST" action="/upload-receipt/${t.token}" enctype="multipart/form-data">
-        <input type="file" name="receipt" required style="margin-bottom: 15px;">
-        <br>
-        <button type="submit">Upload Receipt</button>
-      </form>
-    </body></html>
-  `);
-});
-
-// API: UPLOAD RECEIPT
-app.post('/upload-receipt/:token', upload.single('receipt'), async (req, res) => {
   try {
     const t = db.prepare(`SELECT * FROM tickets WHERE token = ?`).get(req.params.token);
-    const receiptUrl = '/receipts/' + req.file.filename;
+    if (!t) return res.status(404).send('Invalid link.');
     
-    db.prepare(`UPDATE tickets SET status = 'pending_verification', receipt_url = ? WHERE token = ?`).run(receiptUrl, t.token);
+    let ticketWord = t.ticket_quantity > 1 ? 'tickets' : 'a ticket';
 
     res.send(`
       <html>
       <body style="font-family:sans-serif;text-align:center;margin-top:50px;">
-        <h2>Receipt Uploaded Successfully! ✅</h2>
-        <p>We will verify your payment shortly. Once confirmed, your ticket will be emailed to <b>${t.buyer_email}</b>.</p>
+        <h2>Ticket Transfer</h2>
+        <p><b>${t.sender_name}</b> sent you ${ticketWord} for ${t.event_name}</p>
+        <p><b>Quantity:</b> ${t.ticket_quantity}</p>
+        <p>Amount Due: ${t.currency} ${t.amount}</p>
+        <form method="POST" action="/accept/${t.token}"><button style="padding:10px 20px;font-size:16px;">Accept & Pay</button></form>
       </body></html>
     `);
   } catch (err) {
-    res.status(500).send('Upload failed: ' + err.message);
+    res.status(404).send('Invalid link.');
   }
 });
 
-// API: ADMIN APPROVES RECEIPT
+app.post('/accept/:token', (req, res) => {
+  try {
+    const t = db.prepare(`SELECT * FROM tickets WHERE token = ?`).get(req.params.token);
+    if (!t) return res.status(404).send('Invalid link.');
+    
+    res.send(`
+      <html>
+      <body style="font-family:sans-serif;max-width:600px;margin:40px auto;padding:20px;text-align:center;">
+        <h2>Complete Your Payment</h2>
+        <p>Please pay <b>${t.currency} ${t.amount}</b> using:</p>
+        <div style="background:#f1f1f1; padding:15px; border-radius:8px; text-align:left; margin-bottom:20px;">
+          <h3>${t.payment_method}</h3>
+          <pre style="white-space:pre-wrap; font-family:sans-serif;">${t.payment_details}</pre>
+        </div>
+        <form method="POST" action="/upload-receipt/${t.token}" enctype="multipart/form-data">
+          <input type="file" name="receipt" required style="margin-bottom:10px;"><br>
+          <button style="padding:10px 20px;background:#28a745;color:white;border:none;border-radius:5px;">Upload Receipt</button>
+        </form>
+      </body></html>
+    `);
+  } catch (err) {
+    res.status(404).send('Invalid link.');
+  }
+});
+
+// --- UPLOAD RECEIPT ---
+app.post('/upload-receipt/:token', upload.single('receipt'), async (req, res) => {
+  try {
+    const t = db.prepare(`SELECT * FROM tickets WHERE token = ?`).get(req.params.token);
+    const receiptUrl = '/receipts/' + req.file.filename;
+    db.prepare(`UPDATE tickets SET status = 'pending_verification', receipt_url = ? WHERE token = ?`).run(receiptUrl, t.token);
+    res.send(`<html><body style="font-family:sans-serif;text-align:center;margin-top:50px;"><h2>Receipt Uploaded! ✅</h2><p>We will verify and email your ticket.</p></body></html>`);
+  } catch (err) { res.status(500).send('Upload failed: ' + err.message); }
+});
+
+// --- APPROVE TICKET ---
 app.post('/api/admin/approve/:token', async (req, res) => {
   try {
     const t = db.prepare(`SELECT * FROM tickets WHERE token = ?`).get(req.params.token);
     if (t && t.status !== 'sold') {
       db.prepare(`UPDATE tickets SET status = 'sold' WHERE id = ?`).run(t.id);
       const qrDataUrl = await QRCode.toDataURL(JSON.stringify({ code: t.ticket_code, event: t.event_name }));
-      await sendTicketEmail(t.buyer_email, t.event_name, t.ticket_code, qrDataUrl);
+      await sendTicketEmail(t.buyer_email, t.event_name, t.ticket_code, t.ticket_quantity, qrDataUrl);
       res.json({ ok: true });
-    } else {
-      res.status(400).json({ ok: false, error: 'Ticket already sold or invalid.' });
-    }
-  } catch (err) {
-    res.status(500).json({ ok: false, error: err.message });
-  }
+    } else { res.status(400).json({ ok: false }); }
+  } catch (err) { res.status(500).json({ ok: false }); }
 });
 
 app.listen(process.env.PORT, () => {
